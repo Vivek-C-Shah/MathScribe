@@ -7,7 +7,7 @@
     "dev": "npm run lint & vite",
     "build": "tsc -b && vite build",
     "lint": "eslint .",
-    "preview": "vite preview"
+    "start": "vite preview"
   },
   "dependencies": {
     "@mantine/core": "^7.12.0",
