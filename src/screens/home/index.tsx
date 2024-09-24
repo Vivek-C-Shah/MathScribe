@@ -107,7 +107,9 @@ export default function Home() {
             });
         };
 
-        return () => document.head.removeChild(script);
+        return () => {
+            document.head.removeChild(script);
+        };
     }, [strokeWidth, color]);
 
     useEffect(() => {
