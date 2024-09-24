@@ -1,5 +1,9 @@
 # MathScribe - Math Notes Bot
 
+## Deployed URL
+
+You can access the deployed application [here](https://mathscribe-backend.onrender.com).
+
 ## Overview
 
 **MathScribe** is a bot designed to solve mathematical and physics problems dynamically from whiteboard-style drawings. It works through a client-server architecture, where the user can interact with a canvas interface on the client-side to draw, add text, and solve math problems. Upon executing, the server-side processes the images using machine learning models (via APIs) to solve the problems and provide the correct answers. The server integrates tools such as Pillow (for image processing) and LLMs (Large Language Models) for problem analysis.
@@ -68,3 +72,7 @@ The server-side is responsible for analyzing the user-drawn images and solving t
   - **Base64** encoding for transferring images via API.
   - **Language Models** for the AI/ML part.
   
+## Screenshots
+![Pythagoras Sum](screenshots/shadow_pytha.png)
+![Integration Sum](screenshots/integration.png)
+![Summation Sum](screenshots/summation.png)

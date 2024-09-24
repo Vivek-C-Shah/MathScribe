@@ -424,7 +424,7 @@ export default function Home() {
                     const imageDataURL = offscreenCanvas.toDataURL("image/png");
                     console.log("Image Data URL:", imageDataURL);
                     const response = await axios.post(
-                        `${import.meta.env.VITE_API_URL}/calculate`,
+                        `${import.meta.env.VITE_API_URL}/magic`,
                         {
                             image: imageDataURL,
                             dict_of_vars: dictOfVars,
