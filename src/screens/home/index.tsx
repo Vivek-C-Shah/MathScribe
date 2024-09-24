@@ -4,7 +4,6 @@ import React, { useEffect, useRef, useState, useCallback } from 'react';
 import axios from 'axios';
 import Draggable from 'react-draggable';
 import { SWATCHES } from '@/constants';
-
 enum Tool {
     Draw = 'draw',
     Erase = 'erase',
@@ -13,21 +12,17 @@ enum Tool {
     Square = 'square',
     Circle = 'circle',
     Triangle = 'triangle',
-    // Add more shapes as needed
 }
-
 interface GeneratedResult {
     expression: string;
     answer: string;
 }
-
 interface TextItem {
     id: number;
     position: { x: number; y: number };
     text: string;
     fontSize: number;
 }
-
 declare global {
     interface Window {
         MathJax: {
@@ -38,7 +33,6 @@ declare global {
         };
     }
 }
-
 export default function Home() {
     const canvasRef = useRef<HTMLCanvasElement>(null);
     const [isDrawing, setIsDrawing] = useState(false);
@@ -56,18 +50,12 @@ export default function Home() {
     const [fontSize, setFontSize] = useState(16);
     const [selectedTextItemId, setSelectedTextItemId] = useState<number | null>(null);
     const [isDragging, setIsDragging] = useState(false);
-
     const [startPoint, setStartPoint] = useState<{ x: number; y: number } | null>(null);
-
     const MAX_STACK_SIZE = 20;
-
-    // Reference for MathJax typesetting
     const latexContainerRef = useRef<HTMLDivElement>(null);
     const textContainerRef = useRef(null);
-
     useEffect(() => {
         const canvas = canvasRef.current;
-
         if (canvas) {
             const ctx = canvas.getContext('2d');
             if (ctx) {
@@ -76,35 +64,29 @@ export default function Home() {
                 ctx.lineCap = 'round';
                 ctx.lineWidth = 3;
                 ctx.strokeStyle = 'black';
-
                 ctx.fillStyle = 'white';
                 ctx.fillRect(0, 0, canvas.width, canvas.height);
             }
         }
-
         const script = document.createElement('script');
         script.src =
             'https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.9/MathJax.js?config=TeX-MML-AM_CHTML';
         script.async = true;
         document.head.appendChild(script);
-
         script.onload = () => {
             window.MathJax.Hub.Config({
                 tex2jax: { inlineMath: [['$', '$'], ['\\(', '\\)']] },
             });
         };
-
         return () => {
             document.head.removeChild(script);
         };
     }, []);
-
     useEffect(() => {
         if (result) {
             renderLatexToCanvas(result.expression, result.answer);
         }
     }, [result]);
-
     useEffect(() => {
         if (reset) {
             resetCanvas();
@@ -117,7 +99,6 @@ export default function Home() {
             setLatexExpressions([]);
         }
     }, [reset]);
-
     const resetCanvas = () => {
         const canvas = canvasRef.current;
         if (canvas) {
@@ -129,7 +110,6 @@ export default function Home() {
             }
         }
     };
-
     const saveState = () => {
         const canvas = canvasRef.current;
         if (canvas) {
@@ -144,10 +124,8 @@ export default function Home() {
             setRedoStack([]);
         }
     };
-
     const undo = useCallback(() => {
         if (undoStack.length === 0) return;
-
         const canvas = canvasRef.current;
         if (canvas) {
             const ctx = canvas.getContext('2d');
@@ -155,7 +133,6 @@ export default function Home() {
                 const lastState = undoStack[undoStack.length - 1];
                 setUndoStack((prev) => prev.slice(0, prev.length - 1));
                 setRedoStack((prev) => [...prev, canvas.toDataURL()]);
-
                 const img = new Image();
                 img.src = lastState;
                 img.onload = () => {
@@ -165,10 +142,8 @@ export default function Home() {
             }
         }
     }, [undoStack]);
-
     const redo = useCallback(() => {
         if (redoStack.length === 0) return;
-
         const canvas = canvasRef.current;
         if (canvas) {
             const ctx = canvas.getContext('2d');
@@ -176,7 +151,6 @@ export default function Home() {
                 const lastState = redoStack[redoStack.length - 1];
                 setRedoStack((prev) => prev.slice(0, prev.length - 1));
                 setUndoStack((prev) => [...prev, canvas.toDataURL()]);
-
                 const img = new Image();
                 img.src = lastState;
                 img.onload = () => {
@@ -186,13 +160,10 @@ export default function Home() {
             }
         }
     }, [redoStack]);
-
     const startDrawing = (e: React.MouseEvent<HTMLCanvasElement>) => {
         if (![Tool.Draw, Tool.Erase, Tool.Rectangle, Tool.Circle, Tool.Triangle, Tool.Square].includes(currentTool)) return;
         saveState();
-
         const { offsetX, offsetY } = e.nativeEvent;
-
         if (currentTool === Tool.Draw || currentTool === Tool.Erase) {
             const canvas = canvasRef.current;
             if (canvas) {
@@ -204,11 +175,9 @@ export default function Home() {
                 }
             }
         } else {
-            // For shapes
             setStartPoint({ x: offsetX, y: offsetY });
         }
     };
-
     const draw = (e: React.MouseEvent<HTMLCanvasElement>) => {
         if (isDrawing) {
             const canvas = canvasRef.current;
@@ -228,14 +197,11 @@ export default function Home() {
                 }
             }
         } else if (startPoint && [Tool.Rectangle, Tool.Circle, Tool.Triangle, Tool.Square].includes(currentTool)) {
-            // Handle shape preview
             const canvas = canvasRef.current;
             if (canvas) {
                 const ctx = canvas.getContext('2d');
                 if (ctx) {
-                    // Clear the preview layer
-                    resetCanvas(); // Clear canvas
-                    // Redraw the last undo state to preserve existing drawings
+                    resetCanvas();
                     if (undoStack.length > 0) {
                         const img = new Image();
                         img.src = undoStack[undoStack.length - 1];
@@ -252,7 +218,6 @@ export default function Home() {
             }
         }
     };
-
     const stopDrawing = (e: React.MouseEvent<HTMLCanvasElement>) => {
         if (isDrawing) {
             setIsDrawing(false);
@@ -271,7 +236,6 @@ export default function Home() {
             setStartPoint(null);
         }
     };
-
     const drawShape = (
         ctx: CanvasRenderingContext2D,
         tool: Tool,
@@ -280,7 +244,6 @@ export default function Home() {
     ) => {
         const width = end.x - start.x;
         const height = end.y - start.y;
-
         switch (tool) {
             case Tool.Rectangle:
                 ctx.rect(start.x, start.y, width, height);
@@ -305,7 +268,6 @@ export default function Home() {
                 break;
         }
     };
-    
     const drawFinalShape = (tool: Tool, start: { x: number; y: number }, end: { x: number; y: number }) => {
         const canvas = canvasRef.current;
         if (canvas) {
@@ -320,7 +282,6 @@ export default function Home() {
             }
         }
     };
-
     const getTouchPos = (touchEvent: React.TouchEvent<HTMLCanvasElement>) => {
         const canvas = canvasRef.current;
         if (!canvas) return { x: 0, y: 0 };
@@ -331,14 +292,11 @@ export default function Home() {
             y: touch.clientY - rect.top,
         };
     };
-
     const startDrawingTouch = (e: React.TouchEvent<HTMLCanvasElement>) => {
         e.preventDefault();
         if (![Tool.Draw, Tool.Erase, Tool.Rectangle, Tool.Circle, Tool.Triangle, Tool.Square].includes(currentTool)) return;
         saveState();
-
         const { x, y } = getTouchPos(e);
-
         if (currentTool === Tool.Draw || currentTool === Tool.Erase) {
             const canvas = canvasRef.current;
             if (canvas) {
@@ -350,11 +308,9 @@ export default function Home() {
                 }
             }
         } else {
-            // For shapes
             setStartPoint({ x, y });
         }
     };
-
     const drawTouch = (e: React.TouchEvent<HTMLCanvasElement>) => {
         e.preventDefault();
         if (isDrawing) {
@@ -376,14 +332,12 @@ export default function Home() {
                 }
             }
         } else if (startPoint && [Tool.Rectangle, Tool.Circle, Tool.Triangle, Tool.Square].includes(currentTool)) {
-            // Handle shape preview
             const { x, y } = getTouchPos(e);
             const canvas = canvasRef.current;
             if (canvas) {
                 const ctx = canvas.getContext('2d');
                 if (ctx) {
-                    resetCanvas(); // Clear canvas
-                    // Redraw the last undo state to preserve existing drawings
+                    resetCanvas();
                     if (undoStack.length > 0) {
                         const img = new Image();
                         img.src = undoStack[undoStack.length - 1];
@@ -400,7 +354,6 @@ export default function Home() {
             }
         }
     };
-
     const stopDrawingTouch = (e: React.TouchEvent<HTMLCanvasElement>) => {
         e.preventDefault();
         if (isDrawing) {
@@ -421,38 +374,24 @@ export default function Home() {
             setStartPoint(null);
         }
     };
-
     const runRoute = async () => {
         const canvas = canvasRef.current;
-
         if (canvas) {
             try {
-                // Create an off-screen canvas
                 const offscreenCanvas = document.createElement("canvas");
                 offscreenCanvas.width = canvas.width;
                 offscreenCanvas.height = canvas.height;
                 const ctx = offscreenCanvas.getContext("2d");
-
                 if (ctx) {
-                    // Draw the main canvas onto the off-screen canvas
                     ctx.drawImage(canvas, 0, 0);
-
-                    // Set text alignment and baseline
                     ctx.textBaseline = "top";
-
-                    // Draw each text item onto the off-screen canvas
                     textItems.forEach((item) => {
                         ctx.font = `${item.fontSize}px sans-serif`;
-                        ctx.fillStyle = "black"; // Use desired text color
+                        ctx.fillStyle = "black";
                         ctx.fillText(item.text, item.position.x, item.position.y);
                     });
-
-                    // Get the image data URL from the off-screen canvas
                     const imageDataURL = offscreenCanvas.toDataURL("image/png");
-
                     console.log("Image Data URL:", imageDataURL);
-
-                    // Send the API request with the image data URL
                     const response = await axios.post(
                         `${import.meta.env.VITE_API_URL}/calculate`,
                         {
@@ -460,12 +399,9 @@ export default function Home() {
                             dict_of_vars: dictOfVars,
                         },
                     );
-
                     const resp = response.data;
                     console.log("API Response:", resp);
-
                     if (Array.isArray(resp.data)) {
-                        // Update dictOfVars as before
                         resp.data.forEach((data) => {
                             setDictOfVars((prev) => ({
                                 ...prev,
@@ -478,7 +414,6 @@ export default function Home() {
                             resp.data,
                         );
                     }
-
                     const ctx2 = canvas.getContext("2d");
                     if (ctx2) {
                         const imageData = ctx2.getImageData(
@@ -491,7 +426,6 @@ export default function Home() {
                             minY = canvas.height,
                             maxX = 0,
                             maxY = 0;
-
                         for (let y = 0; y < canvas.height; y++) {
                             for (let x = 0; x < canvas.width; x++) {
                                 const i = (y * canvas.width + x) * 4;
@@ -503,26 +437,20 @@ export default function Home() {
                                 }
                             }
                         }
-
                         const centerX = (minX + maxX) / 2;
                         const centerY = (minY + maxY) / 2;
-
-                        // Removed setLatexPosition
-
                         resp.data.forEach((data, index) => {
                             const assign = data.assign ?? true;
                             if (assign) {
-                                // Calculate a unique position for each expression based on centerX and centerY
-                                const offset = index * 30; // Example offset, adjust as needed
+                                const offset = index * 30;
                                 const newPosition = {
                                     x: centerX + offset,
                                     y: centerY + offset,
                                 };
-
                                 setLatexExpressions((prev) => [
                                     ...prev,
                                     {
-                                        id: prev.length + 1, // Unique ID for each expression
+                                        id: prev.length + 1,
                                         text: `\\(\\LARGE{\\text{${data.expr}} = \\text{${data.result}}}\\)`,
                                         position: newPosition,
                                     },
@@ -536,7 +464,6 @@ export default function Home() {
             }
         }
     };
-
     useEffect(() => {
         const handleKeyDown = (e: KeyboardEvent) => {
             if (e.ctrlKey && e.key === 'z') {
@@ -547,33 +474,28 @@ export default function Home() {
                 redo();
             }
         };
-
         window.addEventListener('keydown', handleKeyDown);
         return () => {
             window.removeEventListener('keydown', handleKeyDown);
         };
     }, [undo, redo]);
-
     const handleCanvasClick = (e: React.MouseEvent<HTMLCanvasElement>) => {
         if (currentTool === Tool.Text) {
             const rect = canvasRef.current?.getBoundingClientRect();
             if (rect) {
                 const x = e.clientX - rect.left;
                 const y = e.clientY - rect.top;
-
                 const newTextItem: TextItem = {
                     id: nextTextItemId,
                     position: { x, y },
                     text: 'Double-click to edit',
                     fontSize: fontSize,
                 };
-
                 setTextItems((prev) => [...prev, newTextItem]);
                 setNextTextItemId((prev) => prev + 1);
             }
         }
     };
-
     const updateTextItemPosition = (id: number, x: number, y: number) => {
         setTextItems((prevItems) =>
             prevItems.map((prevItem) =>
@@ -583,7 +505,6 @@ export default function Home() {
             )
         );
     };
-
     const updateTextItemContent = (id: number, text: string) => {
         setTextItems((prevItems) =>
             prevItems.map((prevItem) =>
@@ -591,31 +512,26 @@ export default function Home() {
             )
         );
     };
-
     const TextItemComponent = React.memo(({ item }: { item: TextItem }) => {
         const contentRef = useRef<HTMLDivElement>(null);
-
         const handleInput = () => {
-            // Do not update state here to prevent re-rendering
         };
-
         const handleBlur = () => {
             const newText = contentRef.current?.textContent || '';
             updateTextItemContent(item.id, newText);
             setSelectedTextItemId(null);
         };
-
         return (
             <Draggable
                 position={item.position}
                 onStop={(_e, data) => {
                     updateTextItemPosition(item.id, data.x, data.y);
                 }}
-                bounds="parent" // Optional: Restrict dragging within parent
-                handle={`#drag-handle-${item.id}`} // Specify the drag handle
+                bounds="parent"
+                handle={`#drag-handle-${item.id}`}
             >
                 <div className="absolute z-20" style={{ cursor: 'move' }}>
-                    {/* Drag Handle */}
+                    {}
                     <div
                         id={`drag-handle-${item.id}`}
                         style={{
@@ -631,8 +547,7 @@ export default function Home() {
                     >
                         &#9776;
                     </div>
-
-                    {/* Editable Text Content */}
+                    {}
                     <div
                         id={`text-item-${item.id}`}
                         className="text-content"
@@ -660,18 +575,15 @@ export default function Home() {
             </Draggable>
         );
     });
-
-    // New useEffect to trigger MathJax when latexExpressions change
     useEffect(() => {
         if (latexExpressions.length > 0 && window.MathJax && latexContainerRef.current) {
             window.MathJax.Hub.Queue(['Typeset', window.MathJax.Hub, latexContainerRef.current]);
         }
     }, [latexExpressions]);
-
     return <>
-        {/* Top Toolbar */}
+        {}
         <div className="grid grid-cols-6 gap-2 p-4 bg-gray-800">
-            {/* Reset Button */}
+            {}
             <Button
                 onClick={() => setReset(true)}
                 className="z-20 bg-red-600 text-white"
@@ -680,8 +592,7 @@ export default function Home() {
             >
                 Reset
             </Button>
-
-            {/* Undo Button */}
+            {}
             <Button
                 onClick={undo}
                 disabled={undoStack.length === 0}
@@ -691,8 +602,7 @@ export default function Home() {
             >
                 Undo
             </Button>
-
-            {/* Redo Button */}
+            {}
             <Button
                 onClick={redo}
                 disabled={redoStack.length === 0}
@@ -702,8 +612,7 @@ export default function Home() {
             >
                 Redo
             </Button>
-
-            {/* Color Swatches and Shape Tools */}
+            {}
             <Group className="z-20 col-span-2">
                 {SWATCHES.map((swatch) => (
                     <ColorSwatch
@@ -713,8 +622,7 @@ export default function Home() {
                         style={{ cursor: "pointer" }}
                     />
                 ))}
-
-                {/* Eraser Button */}
+                {}
                 <Button
                     onClick={() =>
                         setCurrentTool((prev) =>
@@ -727,8 +635,7 @@ export default function Home() {
                 >
                     {currentTool === Tool.Erase ? "Eraser" : "Pencil"}
                 </Button>
-
-                {/* Text Tool Button */}
+                {}
                 <Button
                     onClick={() => setCurrentTool(Tool.Text)}
                     variant={currentTool === Tool.Text ? "filled" : "outline"}
@@ -737,8 +644,7 @@ export default function Home() {
                 >
                     Text
                 </Button>
-
-                {/* Shape Tool Buttons */}
+                {}
                 <Button
                     onClick={() => setCurrentTool(Tool.Rectangle)}
                     variant={currentTool === Tool.Rectangle ? "filled" : "outline"}
@@ -763,10 +669,9 @@ export default function Home() {
                 >
                     Triangle
                 </Button>
-                {/* Add more shape buttons as needed */}
+                {}
             </Group>
-
-            {/* Run Button */}
+            {}
             <Button
                 onClick={runRoute}
                 className="z-20 bg-green-600 text-white"
@@ -775,8 +680,7 @@ export default function Home() {
             >
                 Run
             </Button>
-
-            {/* Font Size Input for Text Tool */}
+            {}
             {currentTool === Tool.Text && (
                 <div className="flex items-center ml-4">
                     <label htmlFor="defaultFontSize" className="mr-2 text-white">
@@ -796,8 +700,7 @@ export default function Home() {
                     />
                 </div>
             )}
-
-            {/* Font Size and Delete for Selected Text Item */}
+            {}
             {selectedTextItemId !== null && (
                 <>
                     <div className="flex items-center ml-4">
@@ -842,8 +745,7 @@ export default function Home() {
                 </>
             )}
         </div>
-
-        {/* Stroke Width Slider */}
+        {}
         <div className="flex items-center p-4 bg-gray-700">
             <label
                 htmlFor="strokeWidth"
@@ -866,10 +768,9 @@ export default function Home() {
             />
             <span className="ml-4 text-white font-medium">{strokeWidth}</span>
         </div>
-
-        {/* Canvas and Overlays */}
+        {}
         <div className="relative w-full h-screen">
-            {/* Canvas */}
+            {}
             <canvas
                 ref={canvasRef}
                 id="canvas"
@@ -894,8 +795,7 @@ export default function Home() {
                 onTouchCancel={stopDrawingTouch}
                 onClick={handleCanvasClick}
             />
-
-            {/* Draggable LaTeX Expressions */}
+            {}
             <div ref={latexContainerRef}>
                 {latexExpressions.map((expr) => (
                     <Draggable
@@ -917,14 +817,12 @@ export default function Home() {
                     </Draggable>
                 ))}
             </div>
-
-            {/* Text Items */}
+            {}
             <div ref={textContainerRef} className="relative w-full h-full">
                 {textItems.map((item) => (
                     <TextItemComponent key={`text-${item.id}`} item={item} />
                 ))}
             </div>
-
         </div>
     </>;
 }
