@@ -4,6 +4,7 @@ import React, { useEffect, useRef, useState, useCallback } from 'react';
 import axios from 'axios';
 import Draggable from 'react-draggable';
 import { SWATCHES } from '@/constants';
+
 enum Tool {
     Draw = 'draw',
     Erase = 'erase',
@@ -13,16 +14,26 @@ enum Tool {
     Circle = 'circle',
     Triangle = 'triangle',
 }
+
 interface GeneratedResult {
-    expression: string;
-    answer: string;
+    expr: string;
+    result: string;
+    assign?: boolean;
 }
+
 interface TextItem {
     id: number;
     position: { x: number; y: number };
     text: string;
     fontSize: number;
 }
+
+interface LatexExpression {
+    id: number;
+    text: string;
+    position: { x: number; y: number };
+}
+
 declare global {
     interface Window {
         MathJax: {
@@ -33,27 +44,43 @@ declare global {
         };
     }
 }
+
 export default function Home() {
     const canvasRef = useRef<HTMLCanvasElement>(null);
-    const [isDrawing, setIsDrawing] = useState(false);
-    const [color, setColor] = useState('rgb(0, 0, 0)');
-    const [strokeWidth, setStrokeWidth] = useState(3);
+    const [isDrawing, setIsDrawing] = useState<boolean>(false);
+    const [color, setColor] = useState<string>('rgb(0, 0, 0)');
+    const [strokeWidth, setStrokeWidth] = useState<number>(3);
     const [currentTool, setCurrentTool] = useState<Tool>(Tool.Draw);
     const [undoStack, setUndoStack] = useState<string[]>([]);
     const [redoStack, setRedoStack] = useState<string[]>([]);
-    const [reset, setReset] = useState(false);
+    const [reset, setReset] = useState<boolean>(false);
     const [dictOfVars, setDictOfVars] = useState<{ [key: string]: string }>({});
-    const [result, setResult] = useState<GeneratedResult>();
-    const [latexExpressions, setLatexExpressions] = useState([]);
+    const [result, setResult] = useState<GeneratedResult | undefined>(undefined);
+    const [latexExpressions, setLatexExpressions] = useState<LatexExpression[]>([]);
     const [textItems, setTextItems] = useState<TextItem[]>([]);
-    const [nextTextItemId, setNextTextItemId] = useState(1);
-    const [fontSize, setFontSize] = useState(16);
+    const [nextTextItemId, setNextTextItemId] = useState<number>(1);
+    const [fontSize, setFontSize] = useState<number>(16);
     const [selectedTextItemId, setSelectedTextItemId] = useState<number | null>(null);
-    const [isDragging, setIsDragging] = useState(false);
+    const [isDragging, setIsDragging] = useState<boolean>(false);
     const [startPoint, setStartPoint] = useState<{ x: number; y: number } | null>(null);
     const MAX_STACK_SIZE = 20;
     const latexContainerRef = useRef<HTMLDivElement>(null);
-    const textContainerRef = useRef(null);
+    const textContainerRef = useRef<HTMLDivElement>(null);
+
+    /**
+     * Function to render LaTeX expressions onto the designated container.
+     * This utilizes MathJax for typesetting.
+     *
+     * @param expression - The LaTeX expression to render.
+     * @param answer - The corresponding answer or result.
+     */
+    const renderLatexToCanvas = (expression: string, answer: string) => {
+        if (latexContainerRef.current && window.MathJax) {
+            latexContainerRef.current.innerHTML += `<div>${expression} = ${answer}</div>`;
+            window.MathJax.Hub.Queue(['Typeset', window.MathJax.Hub, latexContainerRef.current]);
+        }
+    };
+
     useEffect(() => {
         const canvas = canvasRef.current;
         if (canvas) {
@@ -62,12 +89,13 @@ export default function Home() {
                 canvas.width = window.innerWidth;
                 canvas.height = window.innerHeight - canvas.offsetTop;
                 ctx.lineCap = 'round';
-                ctx.lineWidth = 3;
-                ctx.strokeStyle = 'black';
+                ctx.lineWidth = strokeWidth;
+                ctx.strokeStyle = color;
                 ctx.fillStyle = 'white';
                 ctx.fillRect(0, 0, canvas.width, canvas.height);
             }
         }
+
         const script = document.createElement('script');
         script.src =
             'https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.9/MathJax.js?config=TeX-MML-AM_CHTML';
@@ -78,15 +106,16 @@ export default function Home() {
                 tex2jax: { inlineMath: [['$', '$'], ['\\(', '\\)']] },
             });
         };
-        return () => {
-            document.head.removeChild(script);
-        };
-    }, []);
+
+        return () => document.head.removeChild(script);
+    }, [strokeWidth, color]);
+
     useEffect(() => {
         if (result) {
-            renderLatexToCanvas(result.expression, result.answer);
+            renderLatexToCanvas(result.expr, result.result);
         }
     }, [result]);
+
     useEffect(() => {
         if (reset) {
             resetCanvas();
@@ -99,6 +128,7 @@ export default function Home() {
             setLatexExpressions([]);
         }
     }, [reset]);
+
     const resetCanvas = () => {
         const canvas = canvasRef.current;
         if (canvas) {
@@ -110,6 +140,7 @@ export default function Home() {
             }
         }
     };
+
     const saveState = () => {
         const canvas = canvasRef.current;
         if (canvas) {
@@ -124,6 +155,7 @@ export default function Home() {
             setRedoStack([]);
         }
     };
+
     const undo = useCallback(() => {
         if (undoStack.length === 0) return;
         const canvas = canvasRef.current;
@@ -142,6 +174,7 @@ export default function Home() {
             }
         }
     }, [undoStack]);
+
     const redo = useCallback(() => {
         if (redoStack.length === 0) return;
         const canvas = canvasRef.current;
@@ -160,6 +193,7 @@ export default function Home() {
             }
         }
     }, [redoStack]);
+
     const startDrawing = (e: React.MouseEvent<HTMLCanvasElement>) => {
         if (![Tool.Draw, Tool.Erase, Tool.Rectangle, Tool.Circle, Tool.Triangle, Tool.Square].includes(currentTool)) return;
         saveState();
@@ -178,6 +212,7 @@ export default function Home() {
             setStartPoint({ x: offsetX, y: offsetY });
         }
     };
+
     const draw = (e: React.MouseEvent<HTMLCanvasElement>) => {
         if (isDrawing) {
             const canvas = canvasRef.current;
@@ -218,6 +253,7 @@ export default function Home() {
             }
         }
     };
+
     const stopDrawing = (e: React.MouseEvent<HTMLCanvasElement>) => {
         if (isDrawing) {
             setIsDrawing(false);
@@ -236,6 +272,7 @@ export default function Home() {
             setStartPoint(null);
         }
     };
+
     const drawShape = (
         ctx: CanvasRenderingContext2D,
         tool: Tool,
@@ -268,6 +305,7 @@ export default function Home() {
                 break;
         }
     };
+
     const drawFinalShape = (tool: Tool, start: { x: number; y: number }, end: { x: number; y: number }) => {
         const canvas = canvasRef.current;
         if (canvas) {
@@ -282,7 +320,8 @@ export default function Home() {
             }
         }
     };
-    const getTouchPos = (touchEvent: React.TouchEvent<HTMLCanvasElement>) => {
+
+    const getTouchPos = (touchEvent: React.TouchEvent<HTMLCanvasElement>): { x: number; y: number } => {
         const canvas = canvasRef.current;
         if (!canvas) return { x: 0, y: 0 };
         const rect = canvas.getBoundingClientRect();
@@ -292,6 +331,7 @@ export default function Home() {
             y: touch.clientY - rect.top,
         };
     };
+
     const startDrawingTouch = (e: React.TouchEvent<HTMLCanvasElement>) => {
         e.preventDefault();
         if (![Tool.Draw, Tool.Erase, Tool.Rectangle, Tool.Circle, Tool.Triangle, Tool.Square].includes(currentTool)) return;
@@ -311,6 +351,7 @@ export default function Home() {
             setStartPoint({ x, y });
         }
     };
+
     const drawTouch = (e: React.TouchEvent<HTMLCanvasElement>) => {
         e.preventDefault();
         if (isDrawing) {
@@ -354,6 +395,7 @@ export default function Home() {
             }
         }
     };
+
     const stopDrawingTouch = (e: React.TouchEvent<HTMLCanvasElement>) => {
         e.preventDefault();
         if (isDrawing) {
@@ -374,6 +416,7 @@ export default function Home() {
             setStartPoint(null);
         }
     };
+
     const runRoute = async () => {
         const canvas = canvasRef.current;
         if (canvas) {
@@ -402,7 +445,7 @@ export default function Home() {
                     const resp = response.data;
                     console.log("API Response:", resp);
                     if (Array.isArray(resp.data)) {
-                        resp.data.forEach((data) => {
+                        resp.data.forEach((data: GeneratedResult) => {
                             setDictOfVars((prev) => ({
                                 ...prev,
                                 [data.expr]: data.result,
@@ -439,24 +482,26 @@ export default function Home() {
                         }
                         const centerX = (minX + maxX) / 2;
                         const centerY = (minY + maxY) / 2;
-                        resp.data.forEach((data, index) => {
-                            const assign = data.assign ?? true;
-                            if (assign) {
-                                const offset = index * 30;
-                                const newPosition = {
-                                    x: centerX + offset,
-                                    y: centerY + offset,
-                                };
-                                setLatexExpressions((prev) => [
-                                    ...prev,
-                                    {
-                                        id: prev.length + 1,
-                                        text: `\\(\\LARGE{\\text{${data.expr}} = \\text{${data.result}}}\\)`,
-                                        position: newPosition,
-                                    },
-                                ]);
-                            }
-                        });
+                        if (Array.isArray(resp.data)) {
+                            resp.data.forEach((data: GeneratedResult, index: number) => {
+                                const assign = data.assign ?? true;
+                                if (assign) {
+                                    const offset = index * 30;
+                                    const newPosition = {
+                                        x: centerX + offset,
+                                        y: centerY + offset,
+                                    };
+                                    setLatexExpressions((prev) => [
+                                        ...prev,
+                                        {
+                                            id: prev.length + 1,
+                                            text: `\\(\\LARGE{\\text{${data.expr}} = \\text{${data.result}}}\\)`,
+                                            position: newPosition,
+                                        },
+                                    ]);
+                                }
+                            });
+                        }
                     }
                 }
             } catch (error) {
@@ -464,6 +509,7 @@ export default function Home() {
             }
         }
     };
+
     useEffect(() => {
         const handleKeyDown = (e: KeyboardEvent) => {
             if (e.ctrlKey && e.key === 'z') {
@@ -479,6 +525,7 @@ export default function Home() {
             window.removeEventListener('keydown', handleKeyDown);
         };
     }, [undo, redo]);
+
     const handleCanvasClick = (e: React.MouseEvent<HTMLCanvasElement>) => {
         if (currentTool === Tool.Text) {
             const rect = canvasRef.current?.getBoundingClientRect();
@@ -496,6 +543,7 @@ export default function Home() {
             }
         }
     };
+
     const updateTextItemPosition = (id: number, x: number, y: number) => {
         setTextItems((prevItems) =>
             prevItems.map((prevItem) =>
@@ -505,6 +553,7 @@ export default function Home() {
             )
         );
     };
+
     const updateTextItemContent = (id: number, text: string) => {
         setTextItems((prevItems) =>
             prevItems.map((prevItem) =>
@@ -512,9 +561,11 @@ export default function Home() {
             )
         );
     };
+
     const TextItemComponent = React.memo(({ item }: { item: TextItem }) => {
         const contentRef = useRef<HTMLDivElement>(null);
         const handleInput = () => {
+            // Handle input if needed
         };
         const handleBlur = () => {
             const newText = contentRef.current?.textContent || '';
@@ -531,7 +582,6 @@ export default function Home() {
                 handle={`#drag-handle-${item.id}`}
             >
                 <div className="absolute z-20" style={{ cursor: 'move' }}>
-                    {}
                     <div
                         id={`drag-handle-${item.id}`}
                         style={{
@@ -547,7 +597,6 @@ export default function Home() {
                     >
                         &#9776;
                     </div>
-                    {}
                     <div
                         id={`text-item-${item.id}`}
                         className="text-content"
@@ -575,254 +624,241 @@ export default function Home() {
             </Draggable>
         );
     });
+
     useEffect(() => {
         if (latexExpressions.length > 0 && window.MathJax && latexContainerRef.current) {
             window.MathJax.Hub.Queue(['Typeset', window.MathJax.Hub, latexContainerRef.current]);
         }
     }, [latexExpressions]);
-    return <>
-        {}
-        <div className="grid grid-cols-6 gap-2 p-4 bg-gray-800">
-            {}
-            <Button
-                onClick={() => setReset(true)}
-                className="z-20 bg-red-600 text-white"
-                variant="filled"
-                color="red"
-            >
-                Reset
-            </Button>
-            {}
-            <Button
-                onClick={undo}
-                disabled={undoStack.length === 0}
-                className="z-20 bg-blue-600 text-white"
-                variant="filled"
-                color="blue"
-            >
-                Undo
-            </Button>
-            {}
-            <Button
-                onClick={redo}
-                disabled={redoStack.length === 0}
-                className="z-20 bg-blue-600 text-white"
-                variant="filled"
-                color="blue"
-            >
-                Redo
-            </Button>
-            {}
-            <Group className="z-20 col-span-2">
-                {SWATCHES.map((swatch) => (
-                    <ColorSwatch
-                        key={swatch}
-                        color={swatch}
-                        onClick={() => setColor(swatch)}
-                        style={{ cursor: "pointer" }}
-                    />
-                ))}
-                {}
+
+    return (
+        <>
+            <div className="grid grid-cols-6 gap-2 p-4 bg-gray-800">
                 <Button
-                    onClick={() =>
-                        setCurrentTool((prev) =>
-                            prev === Tool.Erase ? Tool.Draw : Tool.Erase,
-                        )
-                    }
-                    variant={currentTool === Tool.Erase ? "filled" : "outline"}
-                    color={currentTool === Tool.Erase ? "red" : "gray"}
-                    className="ml-2 flex items-center justify-center"
+                    onClick={() => setReset(true)}
+                    className="z-20 bg-red-600 text-white"
+                    variant="filled"
+                    color="red"
                 >
-                    {currentTool === Tool.Erase ? "Eraser" : "Pencil"}
-                </Button>
-                {}
-                <Button
-                    onClick={() => setCurrentTool(Tool.Text)}
-                    variant={currentTool === Tool.Text ? "filled" : "outline"}
-                    color={currentTool === Tool.Text ? "blue" : "gray"}
-                    className="ml-2 flex items-center justify-center"
-                >
-                    Text
-                </Button>
-                {}
-                <Button
-                    onClick={() => setCurrentTool(Tool.Rectangle)}
-                    variant={currentTool === Tool.Rectangle ? "filled" : "outline"}
-                    color={currentTool === Tool.Rectangle ? "green" : "gray"}
-                    className="ml-2 flex items-center justify-center"
-                >
-                    Rectangle
+                    Reset
                 </Button>
                 <Button
-                    onClick={() => setCurrentTool(Tool.Circle)}
-                    variant={currentTool === Tool.Circle ? "filled" : "outline"}
-                    color={currentTool === Tool.Circle ? "green" : "gray"}
-                    className="ml-2 flex items-center justify-center"
+                    onClick={undo}
+                    disabled={undoStack.length === 0}
+                    className="z-20 bg-blue-600 text-white"
+                    variant="filled"
+                    color="blue"
                 >
-                    Circle
+                    Undo
                 </Button>
                 <Button
-                    onClick={() => setCurrentTool(Tool.Triangle)}
-                    variant={currentTool === Tool.Triangle ? "filled" : "outline"}
-                    color={currentTool === Tool.Triangle ? "green" : "gray"}
-                    className="ml-2 flex items-center justify-center"
+                    onClick={redo}
+                    disabled={redoStack.length === 0}
+                    className="z-20 bg-blue-600 text-white"
+                    variant="filled"
+                    color="blue"
                 >
-                    Triangle
+                    Redo
                 </Button>
-                {}
-            </Group>
-            {}
-            <Button
-                onClick={runRoute}
-                className="z-20 bg-green-600 text-white"
-                variant="filled"
-                color="green"
-            >
-                Run
-            </Button>
-            {}
-            {currentTool === Tool.Text && (
-                <div className="flex items-center ml-4">
-                    <label htmlFor="defaultFontSize" className="mr-2 text-white">
-                        Font Size:
-                    </label>
-                    <input
-                        id="defaultFontSize"
-                        type="number"
-                        min="8"
-                        max="72"
-                        value={fontSize}
-                        onChange={(e) => {
-                            const newFontSize = Number(e.target.value);
-                            setFontSize(newFontSize);
-                        }}
-                        className="w-16 p-1 rounded"
-                    />
-                </div>
-            )}
-            {}
-            {selectedTextItemId !== null && (
-                <>
+                <Group className="z-20 col-span-2">
+                    {SWATCHES.map((swatch) => (
+                        <ColorSwatch
+                            key={swatch}
+                            color={swatch}
+                            onClick={() => setColor(swatch)}
+                            style={{ cursor: 'pointer' }}
+                        />
+                    ))}
+                    <Button
+                        onClick={() =>
+                            setCurrentTool((prev) =>
+                                prev === Tool.Erase ? Tool.Draw : Tool.Erase,
+                            )
+                        }
+                        variant={currentTool === Tool.Erase ? "filled" : "outline"}
+                        color={currentTool === Tool.Erase ? "red" : "gray"}
+                        className="ml-2 flex items-center justify-center"
+                    >
+                        {currentTool === Tool.Erase ? "Eraser" : "Pencil"}
+                    </Button>
+                    <Button
+                        onClick={() => setCurrentTool(Tool.Text)}
+                        variant={currentTool === Tool.Text ? "filled" : "outline"}
+                        color={currentTool === Tool.Text ? "blue" : "gray"}
+                        className="ml-2 flex items-center justify-center"
+                    >
+                        Text
+                    </Button>
+                    <Button
+                        onClick={() => setCurrentTool(Tool.Rectangle)}
+                        variant={currentTool === Tool.Rectangle ? "filled" : "outline"}
+                        color={currentTool === Tool.Rectangle ? "green" : "gray"}
+                        className="ml-2 flex items-center justify-center"
+                    >
+                        Rectangle
+                    </Button>
+                    <Button
+                        onClick={() => setCurrentTool(Tool.Circle)}
+                        variant={currentTool === Tool.Circle ? "filled" : "outline"}
+                        color={currentTool === Tool.Circle ? "green" : "gray"}
+                        className="ml-2 flex items-center justify-center"
+                    >
+                        Circle
+                    </Button>
+                    <Button
+                        onClick={() => setCurrentTool(Tool.Triangle)}
+                        variant={currentTool === Tool.Triangle ? "filled" : "outline"}
+                        color={currentTool === Tool.Triangle ? "green" : "gray"}
+                        className="ml-2 flex items-center justify-center"
+                    >
+                        Triangle
+                    </Button>
+                </Group>
+                <Button
+                    onClick={runRoute}
+                    className="z-20 bg-green-600 text-white"
+                    variant="filled"
+                    color="green"
+                >
+                    Run
+                </Button>
+                {currentTool === Tool.Text && (
                     <div className="flex items-center ml-4">
-                        <label htmlFor="fontSize" className="mr-2 text-white">
+                        <label htmlFor="defaultFontSize" className="mr-2 text-white">
                             Font Size:
                         </label>
                         <input
-                            id="fontSize"
+                            id="defaultFontSize"
                             type="number"
                             min="8"
                             max="72"
-                            value={
-                                textItems.find((item) => item.id === selectedTextItemId)
-                                    ?.fontSize || fontSize
-                            }
+                            value={fontSize}
                             onChange={(e) => {
                                 const newFontSize = Number(e.target.value);
-                                setTextItems((prevItems) =>
-                                    prevItems.map((prevItem) =>
-                                        prevItem.id === selectedTextItemId
-                                            ? { ...prevItem, fontSize: newFontSize }
-                                            : prevItem,
-                                    ),
-                                );
+                                setFontSize(newFontSize);
                             }}
                             className="w-16 p-1 rounded"
                         />
                     </div>
-                    <Button
-                        onClick={() => {
-                            setTextItems((prevItems) =>
-                                prevItems.filter(
-                                    (item) => item.id !== selectedTextItemId,
-                                ),
-                            );
-                            setSelectedTextItemId(null);
-                        }}
-                        className="ml-2 bg-red-600 text-white"
-                    >
-                        Delete Text
-                    </Button>
-                </>
-            )}
-        </div>
-        {}
-        <div className="flex items-center p-4 bg-gray-700">
-            <label
-                htmlFor="strokeWidth"
-                className="mr-4 text-white font-medium"
-            >
-                Stroke Width:
-            </label>
-            <input
-                id="strokeWidth"
-                type="range"
-                min="1"
-                max="20"
-                value={strokeWidth}
-                onChange={(e) => {
-                    const newValue = Number(e.target.value);
-                    console.log("Stroke Width Changed To:", newValue);
-                    setStrokeWidth(newValue);
-                }}
-                className="w-full h-2 bg-gray-300 rounded-lg appearance-none cursor-pointer focus:outline-none"
-            />
-            <span className="ml-4 text-white font-medium">{strokeWidth}</span>
-        </div>
-        {}
-        <div className="relative w-full h-screen">
-            {}
-            <canvas
-                ref={canvasRef}
-                id="canvas"
-                className={`absolute top-0 left-0 w-full h-full z-10`}
-                style={{
-                    cursor:
-                        currentTool === Tool.Text
-                            ? "text"
-                            : currentTool === Tool.Erase
-                                ? `url('/eraser-cursor.png') 16 16, auto`
-                                : "crosshair",
-                    touchAction: "none",
-                }}
-                draggable="false"
-                onMouseDown={startDrawing}
-                onMouseMove={draw}
-                onMouseUp={stopDrawing}
-                onMouseOut={stopDrawing}
-                onTouchStart={startDrawingTouch}
-                onTouchMove={drawTouch}
-                onTouchEnd={stopDrawingTouch}
-                onTouchCancel={stopDrawingTouch}
-                onClick={handleCanvasClick}
-            />
-            {}
-            <div ref={latexContainerRef}>
-                {latexExpressions.map((expr) => (
-                    <Draggable
-                        key={`latex-${expr.id}`}
-                        position={expr.position}
-                        onStop={(_e, data) => {
-                            setLatexExpressions((prev) =>
-                                prev.map((item) =>
-                                    item.id === expr.id
-                                        ? { ...item, position: { x: data.x, y: data.y } }
-                                        : item,
-                                ),
-                            );
-                        }}
-                    >
-                        <div className="absolute p-2 text-white bg-gray-900 bg-opacity-75 rounded shadow-md z-20">
-                            <div className="latex-content">{expr.text}</div>
+                )}
+                {selectedTextItemId !== null && (
+                    <>
+                        <div className="flex items-center ml-4">
+                            <label htmlFor="fontSize" className="mr-2 text-white">
+                                Font Size:
+                            </label>
+                            <input
+                                id="fontSize"
+                                type="number"
+                                min="8"
+                                max="72"
+                                value={
+                                    textItems.find((item) => item.id === selectedTextItemId)
+                                        ?.fontSize || fontSize
+                                }
+                                onChange={(e) => {
+                                    const newFontSize = Number(e.target.value);
+                                    setTextItems((prevItems) =>
+                                        prevItems.map((prevItem) =>
+                                            prevItem.id === selectedTextItemId
+                                                ? { ...prevItem, fontSize: newFontSize }
+                                                : prevItem,
+                                        ),
+                                    );
+                                }}
+                                className="w-16 p-1 rounded"
+                            />
                         </div>
-                    </Draggable>
-                ))}
+                        <Button
+                            onClick={() => {
+                                setTextItems((prevItems) =>
+                                    prevItems.filter(
+                                        (item) => item.id !== selectedTextItemId,
+                                    ),
+                                );
+                                setSelectedTextItemId(null);
+                            }}
+                            className="ml-2 bg-red-600 text-white"
+                        >
+                            Delete Text
+                        </Button>
+                    </>
+                )}
             </div>
-            {}
-            <div ref={textContainerRef} className="relative w-full h-full">
-                {textItems.map((item) => (
-                    <TextItemComponent key={`text-${item.id}`} item={item} />
-                ))}
+            <div className="flex items-center p-4 bg-gray-700">
+                <label
+                    htmlFor="strokeWidth"
+                    className="mr-4 text-white font-medium"
+                >
+                    Stroke Width:
+                </label>
+                <input
+                    id="strokeWidth"
+                    type="range"
+                    min="1"
+                    max="20"
+                    value={strokeWidth}
+                    onChange={(e) => {
+                        const newValue = Number(e.target.value);
+                        console.log("Stroke Width Changed To:", newValue);
+                        setStrokeWidth(newValue);
+                    }}
+                    className="w-full h-2 bg-gray-300 rounded-lg appearance-none cursor-pointer focus:outline-none"
+                />
+                <span className="ml-4 text-white font-medium">{strokeWidth}</span>
             </div>
-        </div>
-    </>;
+            <div className="relative w-full h-screen">
+                <canvas
+                    ref={canvasRef}
+                    id="canvas"
+                    className={`absolute top-0 left-0 w-full h-full z-10`}
+                    style={{
+                        cursor:
+                            currentTool === Tool.Text
+                                ? "text"
+                                : currentTool === Tool.Erase
+                                    ? `url('/eraser-cursor.png') 16 16, auto`
+                                    : "crosshair",
+                        touchAction: "none",
+                    }}
+                    draggable="false"
+                    onMouseDown={startDrawing}
+                    onMouseMove={draw}
+                    onMouseUp={stopDrawing}
+                    onMouseOut={stopDrawing}
+                    onTouchStart={startDrawingTouch}
+                    onTouchMove={drawTouch}
+                    onTouchEnd={stopDrawingTouch}
+                    onTouchCancel={stopDrawingTouch}
+                    onClick={handleCanvasClick}
+                />
+                <div ref={latexContainerRef}>
+                    {latexExpressions.map((expr) => (
+                        <Draggable
+                            key={`latex-${expr.id}`}
+                            position={expr.position}
+                            onStop={(_e, data) => {
+                                setLatexExpressions((prev) =>
+                                    prev.map((item) =>
+                                        item.id === expr.id
+                                            ? { ...item, position: { x: data.x, y: data.y } }
+                                            : item,
+                                    ),
+                                );
+                            }}
+                        >
+                            <div className="absolute p-2 text-white bg-gray-900 bg-opacity-75 rounded shadow-md z-20">
+                                <div className="latex-content">{expr.text}</div>
+                            </div>
+                        </Draggable>
+                    ))}
+                </div>
+                <div ref={textContainerRef} className="relative w-full h-full">
+                    {textItems.map((item) => (
+                        <TextItemComponent key={`text-${item.id}`} item={item} />
+                    ))}
+                </div>
+            </div>
+        </>
+    )
 }
