@@ -47,6 +47,7 @@ declare global {
 
 export default function Home() {
     const canvasRef = useRef<HTMLCanvasElement>(null);
+    const ctxRef = useRef<CanvasRenderingContext2D | null>(null); // New ref for context
     const [isDrawing, setIsDrawing] = useState<boolean>(false);
     const [color, setColor] = useState<string>('rgb(0, 0, 0)');
     const [strokeWidth, setStrokeWidth] = useState<number>(3);
@@ -81,16 +82,18 @@ export default function Home() {
         }
     };
 
+    // Canvas Initialization and MathJax Script Loading
     useEffect(() => {
         const canvas = canvasRef.current;
         if (canvas) {
             const ctx = canvas.getContext('2d');
             if (ctx) {
+                ctxRef.current = ctx; // Store context in ref
                 canvas.width = window.innerWidth;
                 canvas.height = window.innerHeight - canvas.offsetTop;
                 ctx.lineCap = 'round';
-                ctx.lineWidth = strokeWidth;
-                ctx.strokeStyle = color;
+                ctx.strokeStyle = color; // Initial strokeStyle
+                ctx.lineWidth = strokeWidth; // Initial lineWidth
                 ctx.fillStyle = 'white';
                 ctx.fillRect(0, 0, canvas.width, canvas.height);
             }
@@ -108,8 +111,22 @@ export default function Home() {
         };
 
         return () => {
+            if (canvasRef.current) {
+                const ctx = canvasRef.current.getContext('2d');
+                if (ctx) {
+                    ctxRef.current = null; // Clear context ref
+                }
+            }
             document.head.removeChild(script);
         };
+    }, []); // Run only once on mount
+
+    // Update strokeWidth and color without resetting the canvas
+    useEffect(() => {
+        if (ctxRef.current) {
+            ctxRef.current.strokeStyle = color;
+            ctxRef.current.lineWidth = strokeWidth;
+        }
     }, [strokeWidth, color]);
 
     useEffect(() => {
@@ -133,13 +150,11 @@ export default function Home() {
 
     const resetCanvas = () => {
         const canvas = canvasRef.current;
-        if (canvas) {
-            const ctx = canvas.getContext('2d');
-            if (ctx) {
-                ctx.clearRect(0, 0, canvas.width, canvas.height);
-                ctx.fillStyle = 'white';
-                ctx.fillRect(0, 0, canvas.width, canvas.height);
-            }
+        if (canvas && ctxRef.current) {
+            const ctx = ctxRef.current;
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            ctx.fillStyle = 'white';
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
         }
     };
 
@@ -161,38 +176,34 @@ export default function Home() {
     const undo = useCallback(() => {
         if (undoStack.length === 0) return;
         const canvas = canvasRef.current;
-        if (canvas) {
-            const ctx = canvas.getContext('2d');
-            if (ctx) {
-                const lastState = undoStack[undoStack.length - 1];
-                setUndoStack((prev) => prev.slice(0, prev.length - 1));
-                setRedoStack((prev) => [...prev, canvas.toDataURL()]);
-                const img = new Image();
-                img.src = lastState;
-                img.onload = () => {
-                    ctx.clearRect(0, 0, canvas.width, canvas.height);
-                    ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
-                };
-            }
+        if (canvas && ctxRef.current) {
+            const ctx = ctxRef.current;
+            const lastState = undoStack[undoStack.length - 1];
+            setUndoStack((prev) => prev.slice(0, prev.length - 1));
+            setRedoStack((prev) => [...prev, canvas.toDataURL()]);
+            const img = new Image();
+            img.src = lastState;
+            img.onload = () => {
+                ctx.clearRect(0, 0, canvas.width, canvas.height);
+                ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+            };
         }
     }, [undoStack]);
 
     const redo = useCallback(() => {
         if (redoStack.length === 0) return;
         const canvas = canvasRef.current;
-        if (canvas) {
-            const ctx = canvas.getContext('2d');
-            if (ctx) {
-                const lastState = redoStack[redoStack.length - 1];
-                setRedoStack((prev) => prev.slice(0, prev.length - 1));
-                setUndoStack((prev) => [...prev, canvas.toDataURL()]);
-                const img = new Image();
-                img.src = lastState;
-                img.onload = () => {
-                    ctx.clearRect(0, 0, canvas.width, canvas.height);
-                    ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
-                };
-            }
+        if (canvas && ctxRef.current) {
+            const ctx = ctxRef.current;
+            const lastState = redoStack[redoStack.length - 1];
+            setRedoStack((prev) => prev.slice(0, prev.length - 1));
+            setUndoStack((prev) => [...prev, canvas.toDataURL()]);
+            const img = new Image();
+            img.src = lastState;
+            img.onload = () => {
+                ctx.clearRect(0, 0, canvas.width, canvas.height);
+                ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+            };
         }
     }, [redoStack]);
 
@@ -201,14 +212,11 @@ export default function Home() {
         saveState();
         const { offsetX, offsetY } = e.nativeEvent;
         if (currentTool === Tool.Draw || currentTool === Tool.Erase) {
-            const canvas = canvasRef.current;
-            if (canvas) {
-                const ctx = canvas.getContext('2d');
-                if (ctx) {
-                    ctx.beginPath();
-                    ctx.moveTo(offsetX, offsetY);
-                    setIsDrawing(true);
-                }
+            if (ctxRef.current) {
+                const ctx = ctxRef.current;
+                ctx.beginPath();
+                ctx.moveTo(offsetX, offsetY);
+                setIsDrawing(true);
             }
         } else {
             setStartPoint({ x: offsetX, y: offsetY });
@@ -217,40 +225,35 @@ export default function Home() {
 
     const draw = (e: React.MouseEvent<HTMLCanvasElement>) => {
         if (isDrawing) {
-            const canvas = canvasRef.current;
-            if (canvas) {
-                const ctx = canvas.getContext('2d');
-                if (ctx) {
-                    if (currentTool === Tool.Erase) {
-                        ctx.globalCompositeOperation = 'destination-out';
-                        ctx.strokeStyle = 'rgba(0,0,0,1)';
-                    } else {
-                        ctx.globalCompositeOperation = 'source-over';
-                        ctx.strokeStyle = color;
-                    }
-                    ctx.lineWidth = strokeWidth;
-                    ctx.lineTo(e.nativeEvent.offsetX, e.nativeEvent.offsetY);
-                    ctx.stroke();
+            if (ctxRef.current) {
+                const ctx = ctxRef.current;
+                if (currentTool === Tool.Erase) {
+                    ctx.globalCompositeOperation = 'destination-out';
+                    ctx.strokeStyle = 'rgba(0,0,0,1)';
+                } else {
+                    ctx.globalCompositeOperation = 'source-over';
+                    ctx.strokeStyle = color;
                 }
+                ctx.lineWidth = strokeWidth;
+                ctx.lineTo(e.nativeEvent.offsetX, e.nativeEvent.offsetY);
+                ctx.stroke();
             }
         } else if (startPoint && [Tool.Rectangle, Tool.Circle, Tool.Triangle, Tool.Square].includes(currentTool)) {
             const canvas = canvasRef.current;
-            if (canvas) {
-                const ctx = canvas.getContext('2d');
-                if (ctx) {
-                    resetCanvas();
-                    if (undoStack.length > 0) {
-                        const img = new Image();
-                        img.src = undoStack[undoStack.length - 1];
-                        img.onload = () => {
-                            ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
-                            ctx.strokeStyle = color;
-                            ctx.lineWidth = strokeWidth;
-                            ctx.beginPath();
-                            drawShape(ctx, currentTool, startPoint, { x: e.nativeEvent.offsetX, y: e.nativeEvent.offsetY });
-                            ctx.stroke();
-                        };
-                    }
+            if (canvas && ctxRef.current) {
+                const ctx = ctxRef.current;
+                resetCanvas();
+                if (undoStack.length > 0) {
+                    const img = new Image();
+                    img.src = undoStack[undoStack.length - 1];
+                    img.onload = () => {
+                        ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+                        ctx.strokeStyle = color;
+                        ctx.lineWidth = strokeWidth;
+                        ctx.beginPath();
+                        drawShape(ctx, currentTool, startPoint, { x: e.nativeEvent.offsetX, y: e.nativeEvent.offsetY });
+                        ctx.stroke();
+                    };
                 }
             }
         }
@@ -259,13 +262,10 @@ export default function Home() {
     const stopDrawing = (e: React.MouseEvent<HTMLCanvasElement>) => {
         if (isDrawing) {
             setIsDrawing(false);
-            const canvas = canvasRef.current;
-            if (canvas) {
-                const ctx = canvas.getContext('2d');
-                if (ctx) {
-                    ctx.closePath();
-                    ctx.globalCompositeOperation = 'source-over';
-                }
+            if (ctxRef.current) {
+                const ctx = ctxRef.current;
+                ctx.closePath();
+                ctx.globalCompositeOperation = 'source-over';
             }
         } else if (startPoint && [Tool.Rectangle, Tool.Circle, Tool.Triangle, Tool.Square].includes(currentTool)) {
             saveState();
@@ -309,17 +309,14 @@ export default function Home() {
     };
 
     const drawFinalShape = (tool: Tool, start: { x: number; y: number }, end: { x: number; y: number }) => {
-        const canvas = canvasRef.current;
-        if (canvas) {
-            const ctx = canvas.getContext('2d');
-            if (ctx) {
-                ctx.strokeStyle = color;
-                ctx.lineWidth = strokeWidth;
-                ctx.beginPath();
-                drawShape(ctx, tool, start, end);
-                ctx.stroke();
-                ctx.closePath();
-            }
+        if (ctxRef.current) {
+            const ctx = ctxRef.current;
+            ctx.strokeStyle = color;
+            ctx.lineWidth = strokeWidth;
+            ctx.beginPath();
+            drawShape(ctx, tool, start, end);
+            ctx.stroke();
+            ctx.closePath();
         }
     };
 
@@ -340,14 +337,11 @@ export default function Home() {
         saveState();
         const { x, y } = getTouchPos(e);
         if (currentTool === Tool.Draw || currentTool === Tool.Erase) {
-            const canvas = canvasRef.current;
-            if (canvas) {
-                const ctx = canvas.getContext('2d');
-                if (ctx) {
-                    ctx.beginPath();
-                    ctx.moveTo(x, y);
-                    setIsDrawing(true);
-                }
+            if (ctxRef.current) {
+                const ctx = ctxRef.current;
+                ctx.beginPath();
+                ctx.moveTo(x, y);
+                setIsDrawing(true);
             }
         } else {
             setStartPoint({ x, y });
@@ -358,41 +352,36 @@ export default function Home() {
         e.preventDefault();
         if (isDrawing) {
             const { x, y } = getTouchPos(e);
-            const canvas = canvasRef.current;
-            if (canvas) {
-                const ctx = canvas.getContext('2d');
-                if (ctx) {
-                    if (currentTool === Tool.Erase) {
-                        ctx.globalCompositeOperation = 'destination-out';
-                        ctx.strokeStyle = 'rgba(0,0,0,1)';
-                    } else {
-                        ctx.globalCompositeOperation = 'source-over';
-                        ctx.strokeStyle = color;
-                    }
-                    ctx.lineWidth = strokeWidth;
-                    ctx.lineTo(x, y);
-                    ctx.stroke();
+            if (ctxRef.current) {
+                const ctx = ctxRef.current;
+                if (currentTool === Tool.Erase) {
+                    ctx.globalCompositeOperation = 'destination-out';
+                    ctx.strokeStyle = 'rgba(0,0,0,1)';
+                } else {
+                    ctx.globalCompositeOperation = 'source-over';
+                    ctx.strokeStyle = color;
                 }
+                ctx.lineWidth = strokeWidth;
+                ctx.lineTo(x, y);
+                ctx.stroke();
             }
         } else if (startPoint && [Tool.Rectangle, Tool.Circle, Tool.Triangle, Tool.Square].includes(currentTool)) {
             const { x, y } = getTouchPos(e);
             const canvas = canvasRef.current;
-            if (canvas) {
-                const ctx = canvas.getContext('2d');
-                if (ctx) {
-                    resetCanvas();
-                    if (undoStack.length > 0) {
-                        const img = new Image();
-                        img.src = undoStack[undoStack.length - 1];
-                        img.onload = () => {
-                            ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
-                            ctx.strokeStyle = color;
-                            ctx.lineWidth = strokeWidth;
-                            ctx.beginPath();
-                            drawShape(ctx, currentTool, startPoint, { x, y });
-                            ctx.stroke();
-                        };
-                    }
+            if (canvas && ctxRef.current) {
+                const ctx = ctxRef.current;
+                resetCanvas();
+                if (undoStack.length > 0) {
+                    const img = new Image();
+                    img.src = undoStack[undoStack.length - 1];
+                    img.onload = () => {
+                        ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+                        ctx.strokeStyle = color;
+                        ctx.lineWidth = strokeWidth;
+                        ctx.beginPath();
+                        drawShape(ctx, currentTool, startPoint, { x, y });
+                        ctx.stroke();
+                    };
                 }
             }
         }
@@ -402,13 +391,10 @@ export default function Home() {
         e.preventDefault();
         if (isDrawing) {
             setIsDrawing(false);
-            const canvas = canvasRef.current;
-            if (canvas) {
-                const ctx = canvas.getContext('2d');
-                if (ctx) {
-                    ctx.closePath();
-                    ctx.globalCompositeOperation = 'source-over';
-                }
+            if (ctxRef.current) {
+                const ctx = ctxRef.current;
+                ctx.closePath();
+                ctx.globalCompositeOperation = 'source-over';
             }
         } else if (startPoint && [Tool.Rectangle, Tool.Circle, Tool.Triangle, Tool.Square].includes(currentTool)) {
             saveState();
@@ -551,16 +537,16 @@ export default function Home() {
             prevItems.map((prevItem) =>
                 prevItem.id === id
                     ? { ...prevItem, position: { x, y } }
-                    : prevItem
-            )
+                    : prevItem,
+            ),
         );
     };
 
     const updateTextItemContent = (id: number, text: string) => {
         setTextItems((prevItems) =>
             prevItems.map((prevItem) =>
-                prevItem.id === id ? { ...prevItem, text } : prevItem
-            )
+                prevItem.id === id ? { ...prevItem, text } : prevItem,
+            ),
         );
     };
 
